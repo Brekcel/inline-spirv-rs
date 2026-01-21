@@ -1,4 +1,4 @@
-use inline_spirv::{inline_spirv, include_spirv as include_spirv_raw};
+use inline_spirv::{include_spirv as include_spirv_raw, inline_spirv};
 use spirq::prelude::*;
 
 // Notice how you can make a more customized version of include macro, same for
@@ -18,11 +18,12 @@ macro_rules! include_spirv {
 }
 
 fn main() {
-    #[cfg(feature = "shaderc")]
+    #[cfg(feature = "glsl_shaderc")]
     let vert: &[u32] = include_spirv!("examples/demo/assets/demo.hlsl", vert);
 
-    #[cfg(feature = "shaderc")]
-    let frag: &[u32] = inline_spirv!(r#"
+    #[cfg(feature = "glsl_shaderc")]
+    let frag: &[u32] = inline_spirv!(
+        r#"
         #version 450 core
         layout(constant_id = 233) const float hack_scale = 0;
 
@@ -37,40 +38,68 @@ fn main() {
         void main() {
             color = texture(limap, uv) + texture(emit_map, uv) * hack_scale;
         }
-    "#, frag, auto_bind);
+    "#,
+        frag,
+        auto_bind
+    );
 
-    #[cfg(feature = "shaderc")]
+    #[cfg(feature = "glsl_shaderc")]
     let comp: &[u32] = include_spirv_raw!("examples/demo/assets/demo.comp.spv");
 
-    #[cfg(feature = "naga")]
-    let wgsl_shader: &[u32] = include_spirv_raw!("examples/demo/assets/shader.wgsl", wgsl);
+    #[cfg(feature = "wgsl_naga")]
+    let wgsl_shader: &[u32] = include_spirv_raw!(
+        "examples/demo/assets/shader.wgsl",
+        frag,
+        wgsl,
+        entry = "fs_main"
+    );
 
-    #[cfg(feature = "naga")]
-    let hello_triangle: &[u32] = inline_spirv!(r#"
-        [[stage(vertex)]]
-        fn vs_main([[builtin(vertex_index)]] in_vertex_index: u32) -> [[builtin(position)]] vec4<f32> {
+    #[cfg(feature = "wgsl_naga")]
+    let hello_triangle: &[u32] = inline_spirv!(
+        r#"
+        @vertex
+        fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4<f32> {
             let x = f32(i32(in_vertex_index) - 1);
             let y = f32(i32(in_vertex_index & 1u) * 2 - 1);
             return vec4<f32>(x, y, 0.0, 1.0);
         }
 
-        [[stage(fragment)]]
-        fn fs_main() -> [[location(0)]] vec4<f32> {
+        @fragment
+        fn fs_main() -> @location(0) vec4<f32> {
             return vec4<f32>(1.0, 0.0, 0.0, 1.0);
         }
-    "#, wgsl);
+    "#,
+        frag,
+        wgsl,
+        entry = "fs_main"
+    );
 
-    #[cfg(feature = "shaderc")]
-    println!("hlsl vertex shader:\n{:#?}", ReflectConfig::new().spv(vert).reflect().unwrap()[0]);
-    #[cfg(feature = "shaderc")]
-    println!("glsl fragment shader:\n{:#?}", ReflectConfig::new().spv(frag).reflect().unwrap()[0]);
-    #[cfg(feature = "shaderc")]
-    println!("spirv compute shader:\n{:#?}", ReflectConfig::new().spv(comp).reflect().unwrap()[0]);
+    #[cfg(feature = "glsl_shaderc")]
+    println!(
+        "hlsl vertex shader:\n{:#?}",
+        ReflectConfig::new().spv(vert).reflect().unwrap()[0]
+    );
+    #[cfg(feature = "glsl_shaderc")]
+    println!(
+        "glsl fragment shader:\n{:#?}",
+        ReflectConfig::new().spv(frag).reflect().unwrap()[0]
+    );
+    #[cfg(feature = "glsl_shaderc")]
+    println!(
+        "spirv compute shader:\n{:#?}",
+        ReflectConfig::new().spv(comp).reflect().unwrap()[0]
+    );
 
-    #[cfg(feature = "naga")]
-    println!("wgsl shader:\n{:#?}", ReflectConfig::new().spv(wgsl_shader).reflect_vec().unwrap()[0]);
-    #[cfg(feature = "naga")]
-    println!("hello shader:\n{:#?}", ReflectConfig::new().spv(hello_triangle).reflect_vec().unwrap()[0]);
+    #[cfg(feature = "wgsl_naga")]
+    println!(
+        "wgsl shader:\n{:#?}",
+        ReflectConfig::new().spv(wgsl_shader).reflect().unwrap()[0]
+    );
+    #[cfg(feature = "wgsl_naga")]
+    println!(
+        "hello shader:\n{:#?}",
+        ReflectConfig::new().spv(hello_triangle).reflect().unwrap()[0]
+    );
 
     println!("sounds good");
 }

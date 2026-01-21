@@ -1,6 +1,7 @@
 [workspace]
+resolver = "3"
 members = [
     "inline-spirv",
-    "jit-spirv",
-    "jit-spirv-impl",
+    # "jit-spirv",
+    # "jit-spirv-impl",
 ]

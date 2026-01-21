@@ -67,7 +67,7 @@
 //!     I "path/to/shader-headers/",
 //!     I "path/to/also-shader-headers/");
 //! ```
-//! 
+//!
 //! ## Include SPIR-V Binary
 //!
 //! You may also want to inline precompiled SPIR-V binaries if you already have
@@ -151,15 +151,22 @@
 //! let vert: &[u32] = include_spirv!("examples/demo/assets/demo.hlsl", vert);
 //! ```
 extern crate proc_macro;
-use std::convert::TryInto;
-use std::path::{Path, PathBuf};
+use std::{
+    convert::TryInto,
+    path::{Path, PathBuf},
+};
 
 mod backends;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse::{Parse, ParseStream, Result as ParseResult, Error as ParseError};
-use syn::{parse_macro_input, Ident, LitStr, Token};
+use syn::{
+    Ident,
+    LitStr,
+    Token,
+    parse::{Error as ParseError, Parse, ParseStream, Result as ParseResult},
+    parse_macro_input,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum InputSourceLanguage {
@@ -225,7 +232,7 @@ struct ShaderCompilationConfig {
     kind: ShaderKind,
     auto_bind: bool,
     // Backend specific.
-    #[cfg(feature = "naga")]
+    #[cfg(any(feature = "wgsl_naga", feature = "glsl_naga"))]
     y_flip: bool,
 }
 impl Default for ShaderCompilationConfig {
@@ -257,30 +264,30 @@ struct IncludedShaderSource(CompilationFeedback);
 
 #[inline]
 fn get_base_dir() -> PathBuf {
-    let base_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .expect("`inline-spirv` can only be used in build time");
+    let base_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("`inline-spirv` can only be used in build time");
     PathBuf::from(base_dir)
 }
 #[inline]
 fn parse_str(input: &mut ParseStream) -> ParseResult<String> {
-    input.parse::<LitStr>()
-        .map(|x| x.value())
+    input.parse::<LitStr>().map(|x| x.value())
 }
 #[inline]
 fn parse_ident(input: &mut ParseStream) -> ParseResult<String> {
-    input.parse::<Ident>()
-        .map(|x| x.to_string())
+    input.parse::<Ident>().map(|x| x.to_string())
 }
 
-fn parse_compile_cfg(
-    input: &mut ParseStream
-) -> ParseResult<ShaderCompilationConfig> {
+fn parse_compile_cfg(input: &mut ParseStream) -> ParseResult<ShaderCompilationConfig> {
     let mut cfg = ShaderCompilationConfig::default();
     while !input.is_empty() {
         use syn::Error;
         // Capture comma and collon; they are for readability.
         input.parse::<Token![,]>()?;
-        let k = if let Ok(k) = input.parse::<Ident>() { k } else { break };
+        let k = if let Ok(k) = input.parse::<Ident>() {
+            k
+        } else {
+            break;
+        };
         match &k.to_string() as &str {
             "glsl" => cfg.lang = InputSourceLanguage::Glsl,
             "hlsl" => {
@@ -288,7 +295,7 @@ fn parse_compile_cfg(
                 // HLSL might be illegal if optimization is disabled. Not sure,
                 // `glslangValidator` said this.
                 cfg.optim_lv = OptimizationLevel::MaxPerformance;
-            },
+            }
             "wgsl" => cfg.lang = InputSourceLanguage::Wgsl,
             "spvasm" => cfg.lang = InputSourceLanguage::Spvasm,
 
@@ -307,16 +314,16 @@ fn parse_compile_cfg(
             "rmiss" => cfg.kind = ShaderKind::Miss,
             "rcall" => cfg.kind = ShaderKind::Callable,
 
-            "I" => {
-                cfg.incl_dirs.push(PathBuf::from(parse_str(input)?))
-            },
+            "I" => cfg.incl_dirs.push(PathBuf::from(parse_str(input)?)),
             "D" => {
                 let k = parse_ident(input)?;
                 let v = if input.parse::<Token![=]>().is_ok() {
                     Some(parse_str(input)?)
-                } else { None };
+                } else {
+                    None
+                };
                 cfg.defs.push((k, v));
-            },
+            }
 
             "entry" => {
                 if input.parse::<Token![=]>().is_ok() {
@@ -332,19 +339,19 @@ fn parse_compile_cfg(
             "vulkan" | "vulkan1_0" => {
                 cfg.env_ty = TargetEnvironmentType::Vulkan;
                 cfg.spv_ver = TargetSpirvVersion::Spirv1_0;
-            },
+            }
             "vulkan1_1" => {
                 cfg.env_ty = TargetEnvironmentType::Vulkan;
                 cfg.spv_ver = TargetSpirvVersion::Spirv1_3;
-            },
+            }
             "vulkan1_2" => {
                 cfg.env_ty = TargetEnvironmentType::Vulkan;
                 cfg.spv_ver = TargetSpirvVersion::Spirv1_5;
-            },
+            }
             "opengl" | "opengl4_5" => {
                 cfg.env_ty = TargetEnvironmentType::OpenGL;
                 cfg.spv_ver = TargetSpirvVersion::Spirv1_0;
-            },
+            }
             "webgpu" => {
                 cfg.env_ty = TargetEnvironmentType::WebGpu;
                 cfg.spv_ver = TargetSpirvVersion::Spirv1_0;
@@ -370,10 +377,11 @@ fn parse_compile_cfg(
 }
 
 fn compile(
-    src: &str,
-    path: Option<&str>,
-    cfg: &ShaderCompilationConfig,
+    #[allow(unused)] src: &str,
+    #[allow(unused)] path: Option<&str>,
+    #[allow(unused)] cfg: &ShaderCompilationConfig,
 ) -> Result<CompilationFeedback, String> {
+    #[cfg(feature = "spv_asm")]
     match backends::spirq_spvasm::compile(src, path, cfg) {
         Ok(x) => return Ok(x),
         Err(e) if e != "unsupported source language" => return Err(e),
@@ -395,8 +403,7 @@ fn compile(
 }
 
 fn build_spirv_binary(path: &Path) -> Option<Vec<u32>> {
-    use std::fs::File;
-    use std::io::Read;
+    use std::{fs::File, io::Read};
     let mut buf = Vec::new();
     if let Ok(mut f) = File::open(&path) {
         if buf.len() & 3 != 0 {
@@ -406,7 +413,8 @@ fn build_spirv_binary(path: &Path) -> Option<Vec<u32>> {
         f.read_to_end(&mut buf).ok()?;
     }
 
-    let out = buf.chunks_exact(4)
+    let out = buf
+        .chunks_exact(4)
         .map(|x| x.try_into().unwrap())
         .map(match buf[0] {
             0x03 => u32::from_le_bytes,
@@ -422,12 +430,13 @@ impl Parse for IncludedShaderSource {
     fn parse(mut input: ParseStream) -> ParseResult<Self> {
         use std::ffi::OsStr;
         let path_lit = input.parse::<LitStr>()?;
-        let path = Path::new(&get_base_dir())
-            .join(&path_lit.value());
+        let path = Path::new(&get_base_dir()).join(&path_lit.value());
 
         if !path.exists() || !path.is_file() {
-            return Err(ParseError::new(path_lit.span(),
-                format!("{path} is not a valid source file", path=path_lit.value())));
+            return Err(ParseError::new(
+                path_lit.span(),
+                format!("{path} is not a valid source file", path = path_lit.value()),
+            ));
         }
 
         let is_spirv = path.is_file() && path.extension() == Some(OsStr::new("spv"));
@@ -439,8 +448,8 @@ impl Parse for IncludedShaderSource {
                 dep_paths: vec![],
             }
         } else {
-            let src = std::fs::read_to_string(&path)
-                .map_err(|e| syn::Error::new(path_lit.span(), e))?;
+            let src =
+                std::fs::read_to_string(&path).map_err(|e| syn::Error::new(path_lit.span(), e))?;
             let cfg = parse_compile_cfg(&mut input)?;
             compile(&src, Some(path.to_string_lossy().as_ref()), &cfg)
                 .map_err(|e| ParseError::new(input.span(), e))?
@@ -453,8 +462,7 @@ impl Parse for InlineShaderSource {
     fn parse(mut input: ParseStream) -> ParseResult<Self> {
         let src = parse_str(&mut input)?;
         let cfg = parse_compile_cfg(&mut input)?;
-        let feedback = compile(&src, None, &cfg)
-            .map_err(|e| ParseError::new(input.span(), e))?;
+        let feedback = compile(&src, None, &cfg).map_err(|e| ParseError::new(input.span(), e))?;
         let rv = InlineShaderSource(feedback);
         Ok(rv)
     }
@@ -467,7 +475,8 @@ fn gen_token_stream(feedback: CompilationFeedback) -> TokenStream {
             { #(let _ = include_bytes!(#dep_paths);)* }
             &[#(#spv),*]
         }
-    }).into()
+    })
+    .into()
 }
 
 /// Compile inline shader source and embed the SPIR-V binary word sequence.

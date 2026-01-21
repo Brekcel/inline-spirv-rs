@@ -2,7 +2,7 @@
 name = "jit-spirv"
 version = "0.1.1"
 authors = ["PENGUINLIONG <admin@penguinliong.moe>"]
-edition = "2018"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Compile GLSL/HLSL/WGSL to SPIR-V just-in-time with a simple macro."
 repository = "https://github.com/PENGUINLIONG/inline-spirv-rs"

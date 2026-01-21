@@ -1,16 +1,19 @@
-#[allow(unused_imports)]
-use crate::{CompilationFeedback, InputSourceLanguage, OptimizationLevel,
-    TargetEnvironmentType, TargetSpirvVersion, ShaderKind,
-    ShaderCompilationConfig};
+use crate::{
+    CompilationFeedback,
+    InputSourceLanguage,
+    OptimizationLevel,
+    ShaderCompilationConfig,
+    ShaderKind,
+    TargetEnvironmentType,
+    TargetSpirvVersion,
+};
 
-#[cfg(feature = "shaderc")]
 pub(crate) fn compile(
     src: &str,
     path: Option<&str>,
     cfg: &ShaderCompilationConfig,
 ) -> Result<CompilationFeedback, String> {
-    use std::path::Path;
-    use std::cell::RefCell;
+    use std::{cell::RefCell, path::Path};
 
     let lang = match cfg.lang {
         InputSourceLanguage::Unknown => shaderc::SourceLanguage::GLSL,
@@ -19,22 +22,18 @@ pub(crate) fn compile(
         _ => return Err("unsupported source language".to_owned()),
     };
     let (target_env, vulkan_version) = match (cfg.env_ty, cfg.spv_ver) {
-        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_0) => (
-            shaderc::TargetEnv::Vulkan,
-            shaderc::EnvVersion::Vulkan1_0,
-        ),
-        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_3) => (
-            shaderc::TargetEnv::Vulkan,
-            shaderc::EnvVersion::Vulkan1_1,
-        ),
-        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_5) => (
-            shaderc::TargetEnv::Vulkan,
-            shaderc::EnvVersion::Vulkan1_2,
-        ),
-        (TargetEnvironmentType::OpenGL, TargetSpirvVersion::Spirv1_0) => (
-            shaderc::TargetEnv::OpenGL,
-            shaderc::EnvVersion::OpenGL4_5,
-        ),
+        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_0) => {
+            (shaderc::TargetEnv::Vulkan, shaderc::EnvVersion::Vulkan1_0)
+        }
+        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_3) => {
+            (shaderc::TargetEnv::Vulkan, shaderc::EnvVersion::Vulkan1_1)
+        }
+        (TargetEnvironmentType::Vulkan, TargetSpirvVersion::Spirv1_5) => {
+            (shaderc::TargetEnv::Vulkan, shaderc::EnvVersion::Vulkan1_2)
+        }
+        (TargetEnvironmentType::OpenGL, TargetSpirvVersion::Spirv1_0) => {
+            (shaderc::TargetEnv::OpenGL, shaderc::EnvVersion::OpenGL4_5)
+        }
         _ => return Err("unsupported target".to_owned()),
     };
     let optim_lv = match cfg.optim_lv {
@@ -43,25 +42,25 @@ pub(crate) fn compile(
         OptimizationLevel::MaxPerformance => shaderc::OptimizationLevel::Performance,
     };
     let shader_kind = match cfg.kind {
-        ShaderKind::Unknown               => shaderc::ShaderKind::InferFromSource,
-        ShaderKind::Vertex                => shaderc::ShaderKind::DefaultVertex,
-        ShaderKind::TesselationControl    => shaderc::ShaderKind::DefaultTessControl,
+        ShaderKind::Unknown => shaderc::ShaderKind::InferFromSource,
+        ShaderKind::Vertex => shaderc::ShaderKind::DefaultVertex,
+        ShaderKind::TesselationControl => shaderc::ShaderKind::DefaultTessControl,
         ShaderKind::TesselationEvaluation => shaderc::ShaderKind::DefaultTessEvaluation,
-        ShaderKind::Geometry              => shaderc::ShaderKind::DefaultGeometry,
-        ShaderKind::Fragment              => shaderc::ShaderKind::DefaultFragment,
-        ShaderKind::Compute               => shaderc::ShaderKind::DefaultCompute,
-        ShaderKind::Mesh                  => shaderc::ShaderKind::DefaultMesh,
-        ShaderKind::Task                  => shaderc::ShaderKind::DefaultTask,
-        ShaderKind::RayGeneration         => shaderc::ShaderKind::DefaultRayGeneration,
-        ShaderKind::Intersection          => shaderc::ShaderKind::DefaultIntersection,
-        ShaderKind::AnyHit                => shaderc::ShaderKind::DefaultAnyHit,
-        ShaderKind::ClosestHit            => shaderc::ShaderKind::DefaultClosestHit,
-        ShaderKind::Miss                  => shaderc::ShaderKind::DefaultMiss,
-        ShaderKind::Callable              => shaderc::ShaderKind::DefaultCallable,
+        ShaderKind::Geometry => shaderc::ShaderKind::DefaultGeometry,
+        ShaderKind::Fragment => shaderc::ShaderKind::DefaultFragment,
+        ShaderKind::Compute => shaderc::ShaderKind::DefaultCompute,
+        ShaderKind::Mesh => shaderc::ShaderKind::DefaultMesh,
+        ShaderKind::Task => shaderc::ShaderKind::DefaultTask,
+        ShaderKind::RayGeneration => shaderc::ShaderKind::DefaultRayGeneration,
+        ShaderKind::Intersection => shaderc::ShaderKind::DefaultIntersection,
+        ShaderKind::AnyHit => shaderc::ShaderKind::DefaultAnyHit,
+        ShaderKind::ClosestHit => shaderc::ShaderKind::DefaultClosestHit,
+        ShaderKind::Miss => shaderc::ShaderKind::DefaultMiss,
+        ShaderKind::Callable => shaderc::ShaderKind::DefaultCallable,
     };
 
     let mut opt = shaderc::CompileOptions::new()
-        .ok_or("cannot create `shaderc::CompileOptions`")?;
+        .map_err(|_| "cannot create `shaderc::CompileOptions`".to_string())?;
     opt.set_target_env(target_env, vulkan_version as u32);
     opt.set_source_language(lang);
     opt.set_auto_bind_uniforms(cfg.auto_bind);
@@ -98,11 +97,13 @@ pub(crate) fn compile(
     }
 
     let dep_paths = RefCell::new(Vec::new());
-    let mut compiler = shaderc::Compiler::new().unwrap();
+    let compiler = shaderc::Compiler::new().unwrap();
     let path = if let Some(path) = path {
         dep_paths.borrow_mut().push(path.to_owned());
         path
-    } else { "<inline>" };
+    } else {
+        "<inline>"
+    };
     let out = compiler
         .compile_into_spirv(src, shader_kind, &path, &cfg.entry, Some(&opt))
         .map_err(|e| e.to_string())?;
@@ -112,16 +113,7 @@ pub(crate) fn compile(
     let spv = out.as_binary().into();
     let feedback = CompilationFeedback {
         spv,
-        dep_paths: dep_paths.into_inner()
+        dep_paths: dep_paths.into_inner(),
     };
     Ok(feedback)
-}
-
-#[cfg(not(feature = "shaderc"))]
-pub(crate) fn compile(
-    _: &str,
-    _: Option<&str>,
-    _: &ShaderCompilationConfig,
-) -> Result<CompilationFeedback, String> {
-    Err("shaderc backend is not enabled".to_owned())
 }
