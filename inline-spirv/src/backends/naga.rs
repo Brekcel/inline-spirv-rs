@@ -45,8 +45,6 @@ pub(crate) fn compile(
 
     let shader_stage: naga::ShaderStage = cfg.kind.into();
 
-    dbg!(&cfg.entry);
-
     let module = match cfg.lang {
         #[cfg(feature = "wgsl_naga")]
         InputSourceLanguage::Wgsl | InputSourceLanguage::Unknown => {
