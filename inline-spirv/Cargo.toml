@@ -26,7 +26,7 @@ spv_asm = ["spq-spvasm"]
 [dependencies]
 spq-spvasm = { version = "0.1", optional = true}
 shaderc = { version = "0.10.1", optional = true }
-naga = { version = "28.0.0", features = ["spv-out"], optional = true }
+naga = { version = "29.0.3", features = ["spv-out"], optional = true }
 syn = "2.0"
 quote = "1.0"
 
